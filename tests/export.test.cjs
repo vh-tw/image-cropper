@@ -1,0 +1,18 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const {IDBFactory}=require('fake-indexeddb'),{createCanvas,loadImage}=require('@napi-rs/canvas'),JSZip=require('../vendor/jszip.min.js'),Geometry=require('../geometry.js');
+test('full-resolution real PNG export, crop pixels, rotated dimensions, ZIP and edited-only selection',async()=>{
+ const downloads=[],inputs=new Map();for(const id of ['#folderPicker','#filePicker']){const listeners={};inputs.set(id,{files:[],addEventListener:(k,fn)=>listeners[k]=fn,removeEventListener:k=>delete listeners[k],click:()=>queueMicrotask(()=>listeners.change())})}
+ inputs.set('#outputFormat',{value:'png'});inputs.set('#storageNotice',{});
+ const ctx={indexedDB:new IDBFactory(),crypto:require('node:crypto').webcrypto,Geometry,JSZip,File,Blob,TextEncoder,structuredClone,CustomEvent,navigator:{},setTimeout:fn=>{queueMicrotask(fn)},URL:{createObjectURL:b=>{downloads.push(b);return 'blob:test'},revokeObjectURL(){}},document:{querySelector:s=>inputs.get(s),dispatchEvent(){},body:{append(){}},createElement:tag=>{if(tag!=='canvas')return {click(){},remove(){}};const c=createCanvas(300,150);c.toBlob=async(fn,mime)=>{const buffer=await c.encode(mime==='image/jpeg'?'jpeg':mime==='image/webp'?'webp':'png');fn(new Blob([buffer],{type:mime}))};return c}},decodeLocalImage:async file=>{const bitmap=await loadImage(Buffer.from(await file.arrayBuffer()));bitmap.close=()=>{};return {bitmap,w:bitmap.width,h:bitmap.height}}};
+ vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../client.js','utf8'),ctx);const client=vm.runInContext('Client',ctx);
+ const source=createCanvas(120,80),s=source.getContext('2d');s.fillStyle='red';s.fillRect(0,0,60,80);s.fillStyle='blue';s.fillRect(60,0,60,80);
+ const files=['one.png','two.png'].map(name=>{const f=new File([source.toBuffer('image/png')],name,{lastModified:100});Object.defineProperty(f,'webkitRelativePath',{value:'Originals/'+name});return f});inputs.get('#folderPicker').files=files;await client.choose();
+ const state=await client.api('state'),d=Math.hypot(120,80)*1.12;
+ const crop=[((d-120)/2+20)/d,((d-80)/2+10)/d,40/d,30/d];state.progress.items['one.png']={layout:'fixed-square-v2',rotation:0,crop,edited:true};await client.api('save',{folder:state.folder,progress:state.progress});
+ let result=await client.exportImages(true,()=>{});assert.equal(result.count,1);assert.equal(result.errors.length,0);
+ let zip=await JSZip.loadAsync(await downloads.at(-1).arrayBuffer());assert.equal(zip.file('cropped-results/two.png.png'),null);
+ let image=await loadImage(await zip.file('cropped-results/one.png.png').async('nodebuffer'));assert.equal(image.width,40);assert.equal(image.height,30);const out=createCanvas(40,30);out.getContext('2d').drawImage(image,0,0);assert.deepEqual([...out.getContext('2d').getImageData(20,15,1,1).data],[255,0,0,255]);
+ state.progress.items['one.png'].rotation=90;state.progress.items['one.png'].crop=Geometry.quarter(crop,90);await client.api('save',{folder:state.folder,progress:state.progress});result=await client.exportImages(false,()=>{});assert.equal(result.count,2);
+ zip=await JSZip.loadAsync(await downloads.at(-1).arrayBuffer());image=await loadImage(await zip.file('cropped-results/one.png.png').async('nodebuffer'));assert.equal(image.width,30);assert.equal(image.height,40);
+ const unchanged=await loadImage(await zip.file('cropped-results/two.png.png').async('nodebuffer'));assert.equal(unchanged.width,120);assert.equal(unchanged.height,80);assert.equal(JSON.parse(await zip.file('crop-progress.json').async('string')).progress.items['one.png'].rotation,90);
+});
