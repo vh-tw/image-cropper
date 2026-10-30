@@ -2,10 +2,10 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const root=path.join(__dirname,'..');
 test('Pages subpath assets, syntax, vendored integrity, no server API or external runtime URLs',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- for(const [,url]of html.matchAll(/(?:src|href)="([^"]+)"/g)){assert.ok(url.startsWith('./'),url);assert.ok(fs.existsSync(path.join(root,url)),url)}
+ for(const [,url]of html.matchAll(/(?:src|href)="([^"]+)"/g)){assert.ok(url.startsWith('./'),url);assert.ok(fs.existsSync(path.join(root,url.split('?')[0])),url)}
  for(const file of ['app.js','client.js','geometry.js','decoder.js','decode-worker.js']){const source=fs.readFileSync(path.join(root,file),'utf8');new vm.Script(source,{filename:file});assert.ok(!source.includes('/api/'));assert.ok(!/https?:\/\//.test(source),file)}
  const manifest=JSON.parse(fs.readFileSync(path.join(root,'vendor/manifest.json')));for(const [file,info]of Object.entries(manifest))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'vendor',file))).digest('hex'),info.sha256);
- assert.match(html,/Open Folder/);assert.match(html,/Save Progress/);assert.match(html,/Restore Progress/);
+ assert.match(html,/Open Folder/);assert.match(html,/Save Progress/);assert.match(html,/Restore Progress/);assert.ok(!html.includes('id="saveDestination"'));assert.match(html,/id="downloadZip"/);
 });
 test('ZIP library writes valid independently readable entries',async()=>{
  const JSZip=require('../vendor/jszip.min.js'),zip=new JSZip();zip.file('cropped-results/a.png',new Uint8Array([137,80,78,71]));zip.file('crop-progress.json','{"items":{}}');

@@ -12,9 +12,9 @@ A buildless, browser-only image editor. Images are processed on the visitor's ow
 4. Drag the ↻ handle or change the angle for free 360° rotation. The crop automatically fits inside the actual image. The 90° buttons turn the crop and image together.
 5. Wheel over the actual image to pan it; wheel over empty space to scroll the page. Ctrl + wheel zooms around the pointer, up to 800%. Space + drag / middle-button drag pans. Fit to View resets the zoom.
 6. Each image has independent Undo / Redo, including rotation and reset. Ctrl + Z / Ctrl + Y / Ctrl + Shift + Z act on the hovered image. Fifty undo steps are retained per image.
-7. **Save to → Folder** (default when supported) opens a destination picker. **Save All / Save Edited** creates a new timestamped `cropped-results-*` subfolder and writes images one at a time, including a progress backup. Existing originals/results are not overwritten. Choose **ZIP download** for the original archive workflow or browsers without directory writing support.
+7. **Save All / Save Edited** always opens a destination folder picker and creates a new timestamped `cropped-results-*` subfolder and writes images one at a time, including a progress backup. Existing originals/results are not overwritten. A separate **Download ZIP** button is under Help. Save buttons never automatically download ZIP files; unsupported browsers show guidance to use desktop Chrome/Edge.
 
-開啟資料夾或多張圖片後，即可左右對照、裁切、旋轉、縮放，每張圖片各有復原紀錄；不需逐張按完成。框外操作不改變原框，裁切範圍不超出實際圖片。預設直接儲存到你選擇的資料夾，建立新的帶時間結果子資料夾；不覆蓋原圖或先前輸出。也可改選 ZIP 下載，不需後端。瀏覽器不支援直接寫入時，會使用 ZIP。
+開啟資料夾或多張圖片後，即可左右對照、裁切、旋轉、縮放，每張圖片各有復原紀錄；不需逐張按完成。框外操作不改變原框，裁切範圍不超出實際圖片。預設直接儲存到你選擇的資料夾，建立新的帶時間結果子資料夾；不覆蓋原圖或先前輸出。也可展開說明，另外按「Download ZIP」。兩個 Save 按鈕不會自動轉成 ZIP；不支援直接寫入時會提示改用電腦版 Chrome 或 Edge。
 
 ## Progress / 進度
 

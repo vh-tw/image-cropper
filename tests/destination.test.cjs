@@ -7,5 +7,7 @@ test('destination picker cancellation does not export; directory permission is r
  steps.length=0;context.Client.chooseOutputDirectory=async()=>{steps.push('picker');return {name:'selected'}};
  context.trackPersist=()=>steps.push('persist');vm.runInContext('persist=async()=>trackPersist()',context);
  await vm.runInContext('exportImages(false)',context);assert.deepEqual(steps,['picker','persist','export']);assert.equal(vm.runInContext('busy',context),false);
- steps.length=0;controls.get('#saveDestination').value='zip';await vm.runInContext('exportImages(false)',context);assert.deepEqual(steps,['persist','export'],'ZIP should not request filesystem permissions');
+ steps.length=0;await vm.runInContext("exportImages(false,'zip')",context);assert.deepEqual(steps,['persist','export'],'Only the separate ZIP action should bypass the directory picker');
+ steps.length=0;await vm.runInContext('exportImages(true)',context);assert.deepEqual(steps,['picker','persist','export'],'Save Edited must also require a folder');
+ steps.length=0;context.Client.chooseOutputDirectory=()=>{steps.push('unsupported');throw Error('Folder saving unavailable')};await vm.runInContext('exportImages(false)',context);assert.deepEqual(steps,['unsupported'],'Unsupported browser must not silently download a ZIP');
 });

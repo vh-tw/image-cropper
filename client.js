@@ -43,14 +43,14 @@ const Client=(()=>{
   const toBlob=(canvas,mime,quality)=>new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Image too large to export / 圖片過大，無法輸出')),mime,quality));
   function outputName(name,format='original'){if(format==='png')return name+'.png';if(format==='jpeg')return name+'.jpg';if(/\.(jpe?g|png|webp)$/i.test(name))return name;return name+'.png'}
   const supportsFolder=()=>typeof window!=='undefined'&&typeof window.showDirectoryPicker==='function';
-  function chooseOutputDirectory(){if(!supportsFolder())throw Error('Folder saving is unavailable. Choose ZIP instead. / 此瀏覽器不支援直接儲存資料夾，請改選 ZIP。');return window.showDirectoryPicker({mode:'readwrite',id:'image-crop-output'})}
+  function chooseOutputDirectory(){if(!supportsFolder())throw Error('Direct folder saving is unavailable in this browser. Open this page in desktop Chrome or Edge. / 此瀏覽器不支援直接儲存資料夾，請使用電腦版 Chrome 或 Edge。');return window.showDirectoryPicker({mode:'readwrite',id:'image-crop-output'})}
   async function createOutputDirectory(parent){
     const now=new Date(),pad=n=>String(n).padStart(2,'0'),base='cropped-results-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
     for(let suffix=0;suffix<1000;suffix++){const name=base+(suffix?'-'+(suffix+1):'');try{await parent.getDirectoryHandle(name)}catch(e){if(e.name!=='NotFoundError')throw e;return parent.getDirectoryHandle(name,{create:true})}}
     throw Error('Unable to create a new results folder / 無法建立新的結果資料夾');
   }
   async function writeOutput(root,path,blob){const parts=path.split('/');if(parts.some(p=>!p||p==='.'||p==='..'||p.includes('\\')))throw Error('Invalid output path / 輸出路徑無效');let dir=root;for(const part of parts.slice(0,-1))dir=await dir.getDirectoryHandle(part,{create:true});const file=await dir.getFileHandle(parts.at(-1),{create:true}),stream=await file.createWritable();try{await stream.write(blob);await stream.close()}catch(e){try{await stream.abort?.()}catch(_){}throw e}}
-  async function exportImages(onlyEdited,onProgress,options={}){if(!current.entries.length)throw Error('Select images first / 請先選取圖片');const zip=options.directory?null:new JSZip(),errors=[];let count=0;const format=document.querySelector('#outputFormat').value;
+  async function exportImages(onlyEdited,onProgress,options={}){if(options.mode==='folder'&&!options.directory)throw Error('No destination folder selected. No ZIP was created. / 尚未選取目的地資料夾，不會改成 ZIP 下載。');if(!current.entries.length)throw Error('Select images first / 請先選取圖片');const zip=options.directory?null:new JSZip(),errors=[];let count=0;const format=document.querySelector('#outputFormat').value;
     const entries=current.entries.slice(),progress=clone(current.progress);
     const wasEdited=it=>it&&(it.edited||(it.layout!=='fixed-square-v2'&&(it.rotation||it.crop)));
     if(onlyEdited&&!entries.some(e=>wasEdited(progress.items[e.name])))return {count:0,folder:'No edited images / 尚未有調整過的圖片',errors:[]};
