@@ -70,13 +70,10 @@ const Client=(()=>{
       await new Promise(resolve=>setTimeout(resolve,0));
     }
     if(!count){if(errors.length)throw Error(errors.join('\n'));return {count:0,folder:'No edited images / 尚未有調整過的圖片',errors:[]}}
-    const backup=JSON.stringify({app:'image-crop-studio',version:1,workspace:current.key,progress},null,2);
     if(output){
-      try{await writeOutput(output,'crop-progress.json',new Blob([backup],{type:'application/json'}))}catch(e){errors.push('Progress backup / 進度備份：'+e.message)}
       if(errors.length)try{await writeOutput(output,'export-errors.txt',new Blob([errors.join('\n')],{type:'text/plain'}))}catch(_){}
       return {count,folder:options.directory.name+'/'+output.name,errors};
     }
-    zip.file('crop-progress.json',backup);
     if(errors.length)zip.file('export-errors.txt',errors.join('\n'));
     const blob=await zip.generateAsync({type:'blob',compression:'STORE',streamFiles:true},m=>onProgress(`Building ZIP ${Math.round(m.percent)}%\n正在打包 ZIP…`));
     download(blob,'cropped-images-'+new Date().toISOString().replace(/[:.]/g,'-')+'.zip');return {count,folder:'ZIP download prepared / ZIP 下載已準備完成',errors};

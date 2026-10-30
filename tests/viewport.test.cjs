@@ -4,7 +4,7 @@ const ctx={Geometry:require('../geometry.js'),document:{querySelector:s=>{if(!co
 vm.createContext(ctx);
 const source=fs.readFileSync(__dirname+'/../app.js','utf8');
 vm.runInContext(source.slice(0,source.indexOf("$('#exportEdited').onclick")),ctx);
-function pane(left){const p={style:{},clientWidth:500,clientHeight:500,scrollLeft:0,scrollTop:0,getBoundingClientRect:()=>({left,top:100})};const stage={style:{width:'100%'},getBoundingClientRect:()=>({width:500*parseFloat(stage.style.width)/100,height:500*parseFloat(stage.style.width)/100,left:left-p.scrollLeft,top:100-p.scrollTop})};p.querySelector=()=>stage;return p}
+function pane(left,width=500){const p={style:{},clientWidth:width,clientHeight:width,scrollLeft:0,scrollTop:0,getBoundingClientRect:()=>({left,top:100})};const stage={style:{width:'100%'},getBoundingClientRect:()=>({width:p.clientWidth*parseFloat(stage.style.width)/100,height:p.clientWidth*parseFloat(stage.style.width)/100,left:left-p.scrollLeft,top:100-p.scrollTop})};p.querySelector=()=>stage;return p}
 const panes=[pane(0),pane(520)];ctx.row={dataset:{name:'a',zoom:100},querySelectorAll:()=>panes};
 ctx.pane=panes[1];
 vm.runInContext("state={folder:'test',progress:{items:{a:{crop:[.2,.2,.4,.4],rotation:12.3}}}};var before=JSON.stringify(state.progress);applyZoom(row,200,pane,[720,250])",ctx);
@@ -27,3 +27,8 @@ const height=panes[1].clientHeight;
 vm.runInContext("row.dataset.zoom=400;compactViewport(row,{w:80,h:120})",ctx);
 assert.equal(panes[1].clientHeight,height,'Zoomed viewport must retain its height');
 console.log('PASS: compact landscape viewport, paired heights, centered full image, stable height while zoomed');
+const unequal=[pane(0,300),pane(320,700)];ctx.row2={dataset:{name:'a',zoom:100},querySelectorAll:()=>unequal};ctx.source=unequal[1];
+vm.runInContext('applyZoom(row2,200,source,[670,350])',ctx);
+assert.equal(unequal[1].scrollLeft,350);assert.equal(unequal[0].scrollLeft,150,'3:7 panes must zoom to the same normalized image point');
+assert.equal(unequal[1].scrollTop,250);assert.equal(unequal[0].scrollTop,250*300/700);
+console.log('PASS: synchronized zoom across 30% original and 70% editor widths');
