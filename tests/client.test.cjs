@@ -24,4 +24,5 @@ test('cancel selection, reject malformed progress, collision-safe output names',
  assert.throws(()=>a.api.validateProgress({items:{x:{rotation:0,crop:[0,0,2,1]}}}),/crop/);
  assert.throws(()=>a.api.validateProgress(JSON.parse('{"items":{"__proto__":{"rotation":0}}}')),/name/);
  assert.equal(a.api.outputName('same.jpg','png'),'same.jpg.png');assert.equal(a.api.outputName('same.webp','png'),'same.webp.png');assert.equal(a.api.outputName('scan.tiff'),'scan.tiff.png');assert.equal(a.api.outputName('photo.jpg'),'photo.jpg');
+ assert.equal(a.api.supportsFolder(),false);assert.throws(()=>a.api.chooseOutputDirectory(),/unavailable/);
 });

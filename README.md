@@ -12,9 +12,9 @@ A buildless, browser-only image editor. Images are processed on the visitor's ow
 4. Drag the ↻ handle or change the angle for free 360° rotation. The crop automatically fits inside the actual image. The 90° buttons turn the crop and image together.
 5. Wheel over the actual image to pan it; wheel over empty space to scroll the page. Ctrl + wheel zooms around the pointer, up to 800%. Space + drag / middle-button drag pans. Fit to View resets the zoom.
 6. Each image has independent Undo / Redo, including rotation and reset. Ctrl + Z / Ctrl + Y / Ctrl + Shift + Z act on the hovered image. Fifty undo steps are retained per image.
-7. Export All or Export Edited downloads a ZIP. The ZIP includes the crop-progress JSON. Export does not modify originals.
+7. **Save to → Folder** (default when supported) opens a destination picker. **Save All / Save Edited** creates a new timestamped `cropped-results-*` subfolder and writes images one at a time, including a progress backup. Existing originals/results are not overwritten. Choose **ZIP download** for the original archive workflow or browsers without directory writing support.
 
-開啟資料夾或多張圖片後，即可左右對照、裁切、旋轉、縮放，每張圖片各有復原紀錄；不需逐張按完成。框外操作不改變原框，裁切範圍不超出實際圖片。批次結果以 ZIP 下載，原始檔不變。
+開啟資料夾或多張圖片後，即可左右對照、裁切、旋轉、縮放，每張圖片各有復原紀錄；不需逐張按完成。框外操作不改變原框，裁切範圍不超出實際圖片。預設直接儲存到你選擇的資料夾，建立新的帶時間結果子資料夾；不覆蓋原圖或先前輸出。也可改選 ZIP 下載，不需後端。瀏覽器不支援直接寫入時，會使用 ZIP。
 
 ## Progress / 進度
 
@@ -23,7 +23,7 @@ A buildless, browser-only image editor. Images are processed on the visitor's ow
 - **Save Progress** downloads a JSON backup. To restore it, select the matching original image collection, then use **Restore Progress**. The backup does not include originals.
 - Browser storage has quotas and can be cleared or evicted. A visible warning appears if caching or saving fails. Keep progress backups and your originals.
 - Private/incognito sessions may not retain data after closing. Different browsers and devices do not share progress.
-- Folder imports exclude `裁切結果` and `cropped-results` output directories to avoid reimporting generated images.
+- Folder imports exclude `裁切結果`, `cropped-results` and timestamped `cropped-results-*` output directories to avoid reimporting generated images.
 
 進度與可快取的圖片儲存在本機瀏覽器；清除網站資料、無痕模式或空間不足可能使快取消失。請定期下載進度 JSON；備份不包含原圖，還原時需先選取同一批原圖。
 
@@ -48,3 +48,5 @@ GitHub Pages 設定來源為 GitHub Actions，推送 main 後會先測試再部�
 Node 24+ and pnpm 11.25.0: `pnpm install --frozen-lockfile`, then `pnpm test`. Preview with `python -m http.server 8080 --bind 127.0.0.1` and open `http://127.0.0.1:8080`. Use HTTP/HTTPS rather than `file://` for Worker and storage support.
 
 Vendored libraries are pinned and include their license files and SHA-256 manifest. See `vendor/manifest.json`. `scripts/vendor.py` refreshes the same pinned versions from the official npm registry.
+
+The compact toolbar keeps English labels above Chinese subtitles while taking approximately half the former desktop header height. Help, privacy details and progress backup tools are collapsed by default. Folder writes require your explicit browser permission and remain on your device. Cancelling the destination picker does not export files.

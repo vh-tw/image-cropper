@@ -23,7 +23,7 @@ const Client=(()=>{
   }
   async function choose(mode='folder'){
     await initialized;const selected=await chooseInput(document.querySelector(mode==='files'?'#filePicker':'#folderPicker'));if(!selected.length)return {changed:false};
-    const directory=mode==='folder',entries=selected.filter(f=>extensions.test(f.name)&&!(f.webkitRelativePath||'').split('/').some(p=>p==='裁切結果'||p==='cropped-results')).map(file=>({file,name:directory?file.webkitRelativePath.split('/').slice(1).join('/')||file.name:file.name})).sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true}));
+    const directory=mode==='folder',entries=selected.filter(f=>extensions.test(f.name)&&!(f.webkitRelativePath||'').split('/').slice(0,-1).some(p=>p==='裁切結果'||/^cropped-results(?:-|$)/.test(p))).map(file=>({file,name:directory?file.webkitRelativePath.split('/').slice(1).join('/')||file.name:file.name})).sort((a,b)=>a.name.localeCompare(b.name,'en',{numeric:true}));
     if(!entries.length)throw Error('No supported images selected / 所選資料夾沒有支援的圖片');
     if(new Set(entries.map(e=>e.name)).size!==entries.length)throw Error('Duplicate filenames. Choose a folder to retain subfolder names.\n圖片名稱重複，請選資料夾以保留子資料夾名稱。');
     const key=await fingerprint(entries),label=directory?selected[0].webkitRelativePath.split('/')[0]:`${entries.length} selected images / 張所選圖片`;
@@ -42,8 +42,19 @@ const Client=(()=>{
   function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}
   const toBlob=(canvas,mime,quality)=>new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Image too large to export / 圖片過大，無法輸出')),mime,quality));
   function outputName(name,format='original'){if(format==='png')return name+'.png';if(format==='jpeg')return name+'.jpg';if(/\.(jpe?g|png|webp)$/i.test(name))return name;return name+'.png'}
-  async function exportImages(onlyEdited,onProgress){if(!current.entries.length)throw Error('Select images first / 請先選取圖片');const zip=new JSZip(),errors=[];let count=0;const format=document.querySelector('#outputFormat').value;
+  const supportsFolder=()=>typeof window!=='undefined'&&typeof window.showDirectoryPicker==='function';
+  function chooseOutputDirectory(){if(!supportsFolder())throw Error('Folder saving is unavailable. Choose ZIP instead. / 此瀏覽器不支援直接儲存資料夾，請改選 ZIP。');return window.showDirectoryPicker({mode:'readwrite',id:'image-crop-output'})}
+  async function createOutputDirectory(parent){
+    const now=new Date(),pad=n=>String(n).padStart(2,'0'),base='cropped-results-'+now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+    for(let suffix=0;suffix<1000;suffix++){const name=base+(suffix?'-'+(suffix+1):'');try{await parent.getDirectoryHandle(name)}catch(e){if(e.name!=='NotFoundError')throw e;return parent.getDirectoryHandle(name,{create:true})}}
+    throw Error('Unable to create a new results folder / 無法建立新的結果資料夾');
+  }
+  async function writeOutput(root,path,blob){const parts=path.split('/');if(parts.some(p=>!p||p==='.'||p==='..'||p.includes('\\')))throw Error('Invalid output path / 輸出路徑無效');let dir=root;for(const part of parts.slice(0,-1))dir=await dir.getDirectoryHandle(part,{create:true});const file=await dir.getFileHandle(parts.at(-1),{create:true}),stream=await file.createWritable();try{await stream.write(blob);await stream.close()}catch(e){try{await stream.abort?.()}catch(_){}throw e}}
+  async function exportImages(onlyEdited,onProgress,options={}){if(!current.entries.length)throw Error('Select images first / 請先選取圖片');const zip=options.directory?null:new JSZip(),errors=[];let count=0;const format=document.querySelector('#outputFormat').value;
     const entries=current.entries.slice(),progress=clone(current.progress);
+    const wasEdited=it=>it&&(it.edited||(it.layout!=='fixed-square-v2'&&(it.rotation||it.crop)));
+    if(onlyEdited&&!entries.some(e=>wasEdited(progress.items[e.name])))return {count:0,folder:'No edited images / 尚未有調整過的圖片',errors:[]};
+    const output=options.directory?await createOutputDirectory(options.directory):null;
     for(let i=0;i<entries.length;i++){
       const {name}=entries[i],it=progress.items[name]||{rotation:0,crop:null};
       if(onlyEdited&&!(it.edited||(it.layout!=='fixed-square-v2'&&(it.rotation||it.crop))))continue;
@@ -54,12 +65,18 @@ const Client=(()=>{
         const ctx=canvas.getContext('2d');if(!ctx)throw Error('Cannot create export canvas / 無法建立輸出畫布');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.translate(d/2-c[0]*d,d/2-c[1]*d);ctx.rotate(it.rotation*Math.PI/180);ctx.drawImage(bitmap,-w/2,-h/2,w,h);
         const out=outputName(name,format),mime=/\.jpe?g$/i.test(out)?'image/jpeg':/\.webp$/i.test(out)?'image/webp':'image/png',blob=await toBlob(canvas,mime,.95);
         if(blob.type!==mime)throw Error('This browser cannot encode '+mime+'; select PNG / 請改用 PNG 格式');
-        zip.file('cropped-results/'+out,await blob.arrayBuffer());count++;
+        if(output)await writeOutput(output,out,blob);else zip.file('cropped-results/'+out,await blob.arrayBuffer());count++;
       }catch(e){errors.push(name+': '+e.message)}finally{bitmap?.close();if(canvas)canvas.width=canvas.height=1}
       await new Promise(resolve=>setTimeout(resolve,0));
     }
     if(!count){if(errors.length)throw Error(errors.join('\n'));return {count:0,folder:'No edited images / 尚未有調整過的圖片',errors:[]}}
-    zip.file('crop-progress.json',JSON.stringify({app:'image-crop-studio',version:1,workspace:current.key,progress},null,2));
+    const backup=JSON.stringify({app:'image-crop-studio',version:1,workspace:current.key,progress},null,2);
+    if(output){
+      try{await writeOutput(output,'crop-progress.json',new Blob([backup],{type:'application/json'}))}catch(e){errors.push('Progress backup / 進度備份：'+e.message)}
+      if(errors.length)try{await writeOutput(output,'export-errors.txt',new Blob([errors.join('\n')],{type:'text/plain'}))}catch(_){}
+      return {count,folder:options.directory.name+'/'+output.name,errors};
+    }
+    zip.file('crop-progress.json',backup);
     if(errors.length)zip.file('export-errors.txt',errors.join('\n'));
     const blob=await zip.generateAsync({type:'blob',compression:'STORE',streamFiles:true},m=>onProgress(`Building ZIP ${Math.round(m.percent)}%\n正在打包 ZIP…`));
     download(blob,'cropped-images-'+new Date().toISOString().replace(/[:.]/g,'-')+'.zip');return {count,folder:'ZIP download prepared / ZIP 下載已準備完成',errors};
@@ -67,5 +84,5 @@ const Client=(()=>{
   async function backup(progress){await initialized;download(new Blob([JSON.stringify({app:'image-crop-studio',version:1,workspace:current.key,manifest:current.entries.map(({name,file})=>[name,file.size,file.lastModified]),progress},null,2)],{type:'application/json'}),'crop-progress.json')}
   async function importProgress(){await initialized;if(!current.entries.length)throw Error('Select the original images first / 請先選取原始圖片');const files=await chooseInput(document.querySelector('#progressPicker'));if(!files.length)return {changed:false};const raw=JSON.parse(await files[0].text());if(raw.workspace&&raw.workspace!==current.key)throw Error('This progress belongs to different images. Select the matching original folder.\n此進度對應其他圖片，請先選取相符的原始資料夾。');const clean=validateProgress(raw.progress||raw);const names=new Set(current.entries.map(e=>e.name));for(const name of Object.keys(clean.items))if(!names.has(name))delete clean.items[name];await save(clean);return {changed:true}}
   async function api(path,data){await initialized;if(path==='state')return state();if(path==='choose')return choose();if(path==='save'){if(data.folder!==current.key)throw Error('Folder changed; reload / 資料夾已改變');await save(data.progress);return {ok:true}}throw Error('Unsupported local operation')}
-  return {api,choose,preview,exportImages,backup,importProgress,validateProgress,outputName};
+  return {api,choose,preview,exportImages,backup,importProgress,validateProgress,outputName,supportsFolder,chooseOutputDirectory};
 })();
